@@ -135,4 +135,4 @@ while True:
         topico = assets['mqtt']['topico']
     )
 
-    sleep(5)
+    sleep(60)
