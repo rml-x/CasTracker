@@ -18,44 +18,47 @@ STATUS_MESSAGES = {
     network.STAT_GOT_IP: 'STAT_GOT_IP (Conexão bem-sucedida!)'
 }
 
-def conectar_wifi(ssid, pswd):
+def conectar_wifi(ssid, pswd, tentativas=5, espera=3):
     sta_if = WLAN(STA_IF)
 
     if sta_if.isconnected():
         return True
-    
-    # reseta a interface antes de tentar reconectar
+
     sta_if.active(False)
     sleep(1)
     sta_if.active(True)
     sleep(1)
-    
+
     print(f"Conectando a {ssid} ... ")
     sta_if.connect(ssid, pswd)
-    
-    timeout = 15
-    while not sta_if.isconnected() and timeout > 0:
-        sleep(1)
-        timeout -= 1
 
-    if sta_if.isconnected():
-        print("\nConectado com sucesso!")
-        return True
-    else:
-        sta_if.active(False)
-        final_status = sta_if.status()
-        error_message = STATUS_MESSAGES.get(final_status, f"Código de erro desconhecido: {final_status}")
-        print(f"\nFalha: {error_message}")
-        return False
+    for i in range(tentativas):
+        if sta_if.isconnected():
+            print("\nConectado com sucesso!")
+            return True
+        print(f"WiFi tentativa {i+1}/{tentativas}...")
+        sleep(espera)
 
-def ajustar_hora_ntp(tentativas = 5, espera = 3):
-    settime()  # lança exceção sozinho se falhar, retorna None se ok
-    agora_utc = time()
-    fuso_horario_offset = -3 * 3600
-    tm = localtime(agora_utc + fuso_horario_offset)
-    RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-    print("ntp ok!")
-    return True
+    sta_if.active(False)
+    final_status = sta_if.status()
+    error_message = STATUS_MESSAGES.get(final_status, f"Código de erro desconhecido: {final_status}")
+    print(f"\nFalha: {error_message}")
+    return False
+
+def ajustar_hora_ntp(tentativas = 10, espera = 5):
+    for i in range(tentativas):
+        try:
+            settime()
+            agora_utc = time()
+            fuso_horario_offset = -3 * 3600
+            tm = localtime(agora_utc + fuso_horario_offset)
+            RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
+            print("ntp ok!")
+            return True
+        except Exception as e:
+            print(f"NTP tentativa {i+1}/{tentativas} falhou: {e}")
+            sleep(espera)
+    raise Exception(f"NTP falhou após {tentativas} tentativas")
 
 
 def timestamp():

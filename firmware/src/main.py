@@ -98,7 +98,7 @@ try:
     lcd.imprimir(f"\n{conectar_wifi(assets['wifi']['ssid'],assets['wifi']['pswd'])}",1)
     lcd.imprimir(f"IP: {sta_if.ifconfig()[0]}", 1)
     print(f"Conectado! IP do dispositivo: {sta_if.ifconfig()[0]}")
-    sleep(2)
+    sleep(5)
 except Exception as e:
     lcd.imprimir(f"\n{e}",1)
     print('Erro ao carregar Wifi!',e)
