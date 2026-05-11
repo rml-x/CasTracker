@@ -1,33 +1,29 @@
 @echo off
 echo =======================================================
-echo  CONFIGURANDO AMBIENTE VIRTUAL (FIRMWARE)
+echo  DEPLOY CAS-TRACKER (GRAVACAO NA FLASH)
 echo =======================================================
 
-IF NOT EXIST "venv" (
-    echo [1/4] Criando pasta 'venv'...
-    python -m venv venv
-) ELSE (
-    echo [1/4] Pasta 'venv' ja existe.
+:: Verifica a venv 
+IF NOT EXIST "venv\Scripts\activate.bat" (
+    echo [ERRO] Ambiente virtual nao encontrado!
+    pause
+    exit /b
 )
 
-echo [2/4] Ambiente ativado. Atualizando pip...
 call venv\Scripts\activate.bat
-python -m pip install --upgrade pip
 
-IF NOT EXIST "requirements.txt" (
-    echo       -^> Populando requirements.txt com ferramentas ESP...
-    echo esptool>> requirements.txt
-    echo mpremote>> requirements.txt
-    echo adafruit-ampy>> requirements.txt
-)
+echo [1/3] Limpando e Enviando arquivos atualizados...
+mpremote connect COM6 fs cp src\config.json :config.json
+mpremote connect COM6 fs cp src\main.py :main.py
+mpremote connect COM6 fs cp src\modulos\conexao.py :modulos/conexao.py
+mpremote connect COM6 fs cp src\modulos\interface.py :modulos/interface.py
+mpremote connect COM6 fs cp src\modulos\sensores.py :modulos/sensores.py
+mpremote connect COM6 fs cp src\modulos\ihc.py :modulos/ihc.py
 
-echo [3/4] Instalando ferramentas do FIRMWARE...
-pip install -r requirements.txt
+echo [2/3] Resetando o hardware...
+mpremote connect COM6 reset
 
-echo =======================================================
-echo  SUCESSO! Ambiente configurado.
-echo =======================================================
-echo  Para ativar a venv no seu terminal, rode:
-echo  venv\Scripts\activate
-echo =======================================================
+echo [3/3] Abrindo REPL para monitoramento...
+mpremote connect COM6
+
 pause

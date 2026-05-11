@@ -1,47 +1,62 @@
+import network
 from network import WLAN,STA_IF
 from time import sleep, localtime, time
 from machine import reset, RTC
 from ntptime import settime
 from umqtt.simple import MQTTClient
+from modulos.ihc import meu_lcd
+
+class ConnectionError(Exception):
+    pass
 
 STATUS_MESSAGES = {
-    1000: 'STAT_IDLE',
-    1001: 'STAT_CONNECTING',
-    201: 'STAT_NO_AP_FOUND (Rede não encontrada)',
-    202: 'STAT_WRONG_PASSWORD (Senha incorreta)',
-    203: 'STAT_CONNECT_FAIL (Falha genérica na conexão)',
-    1010: 'STAT_GOT_IP (Conexão bem-sucedida!)'
+    network.STAT_IDLE: 'STAT_IDLE (Ocioso)',
+    network.STAT_CONNECTING: 'STAT_CONNECTING (Conectando...)',
+    network.STAT_WRONG_PASSWORD: 'STAT_WRONG_PASSWORD (Senha incorreta)',
+    network.STAT_NO_AP_FOUND: 'STAT_NO_AP_FOUND (Rede não encontrada)',
+    network.STAT_CONNECT_FAIL: 'STAT_CONNECT_FAIL (Falha na conexão)',
+    network.STAT_GOT_IP: 'STAT_GOT_IP (Conexão bem-sucedida!)'
 }
 
 def conectar_wifi(ssid, pswd):
     sta_if = WLAN(STA_IF)
 
-    if not sta_if.isconnected():
-        sta_if.active(True)
-        sta_if.connect(ssid, pswd)
-        timeout = 15
-        while not sta_if.isconnected() and timeout > 0:
-            sleep(1)
-            timeout -= 1
+    if sta_if.isconnected():
+        return True
+    
+    # reseta a interface antes de tentar reconectar
+    sta_if.active(False)
+    sleep(1)
+    sta_if.active(True)
+    sleep(1)
+    
+    print(f"Conectando a {ssid} ... ")
+    sta_if.connect(ssid, pswd)
+    
+    timeout = 15
+    while not sta_if.isconnected() and timeout > 0:
+        sleep(1)
+        timeout -= 1
 
-    if not sta_if.isconnected():
+    if sta_if.isconnected():
+        print("\nConectado com sucesso!")
+        return True
+    else:
         sta_if.active(False)
         final_status = sta_if.status()
         error_message = STATUS_MESSAGES.get(final_status, f"Código de erro desconhecido: {final_status}")
-        raise ConnectionError(f"Falha ao conectar ao WiFi. Motivo: {error_message}")
-    
-    return 'Conectado!'
+        print(f"\nFalha: {error_message}")
+        return False
 
-def ajustar_hora_ntp():
-    try:
-        settime()
-        agora_utc = time()
-        fuso_horario_offset = -3 * 3600
-        tm = localtime(agora_utc + fuso_horario_offset)
-        RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
-        return 'Hora ajustada!'
-    except Exception as e:
-        raise Exception('Erro NTP!')
+def ajustar_hora_ntp(tentativas = 5, espera = 3):
+    settime()  # lança exceção sozinho se falhar, retorna None se ok
+    agora_utc = time()
+    fuso_horario_offset = -3 * 3600
+    tm = localtime(agora_utc + fuso_horario_offset)
+    RTC().datetime((tm[0], tm[1], tm[2], tm[6], tm[3], tm[4], tm[5], 0))
+    print("ntp ok!")
+    return True
+
 
 def timestamp():
     tupla_data = RTC().datetime()
