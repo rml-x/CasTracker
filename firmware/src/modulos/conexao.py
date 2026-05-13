@@ -20,17 +20,16 @@ STATUS_MESSAGES = {
 
 def conectar_wifi(ssid, pswd, tentativas=5, espera=3):
     sta_if = WLAN(STA_IF)
-
-    if sta_if.isconnected():
-        return True
-
+   
     sta_if.active(False)
     sleep(1)
     sta_if.active(True)
     sleep(1)
 
+
     print(f"Conectando a {ssid} ... ")
     sta_if.connect(ssid, pswd)
+
 
     for i in range(tentativas):
         if sta_if.isconnected():
@@ -38,12 +37,17 @@ def conectar_wifi(ssid, pswd, tentativas=5, espera=3):
             return True
         print(f"WiFi tentativa {i+1}/{tentativas}...")
         sleep(espera)
+    
+    sta_if(False)
+    final_status = sta_if.status()
+    error_message = STATUS_MESSAGES.get(final_status), {final_status}           
+    raise Exception(f"Wifi falhou: {error_message}")
+
 
     sta_if.active(False)
     final_status = sta_if.status()
     error_message = STATUS_MESSAGES.get(final_status, f"Código de erro desconhecido: {final_status}")
     print(f"\nFalha: {error_message}")
-    return False
 
 def ajustar_hora_ntp(tentativas = 10, espera = 5):
     for i in range(tentativas):

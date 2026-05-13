@@ -5,8 +5,10 @@ class cliente_mqtt:
     def __init__(self, broker, id_cliente=''):
         self.broker = broker
         self.id_cliente = id_cliente
-        self.cliente = MQTTClient(self.id_cliente, self.broker)
+        self.cliente = MQTTClient(self.id_cliente, self.broker, keepalive= 60)
         self.cliente.connect()
+        self.cliente.sock.settimeout(10)
+        print(f"MQTT conectado | keepalive=60 | timeout=10s") 
 
     def reconectar(self, tentativas=5, espera=3):
         for i in range(tentativas):
@@ -15,8 +17,10 @@ class cliente_mqtt:
                     self.cliente.disconnect()
                 except:
                     pass
-                self.cliente = MQTTClient(self.id_cliente, self.broker)
+                self.cliente = MQTTClient(self.id_cliente, self.broker, keepalive= 60)
                 self.cliente.connect()
+                self.cliente.sock.settimeout(10)
+                print(f"MQTT conectado | keepalive=60 | timeout=10s")
                 return True
             except Exception as e:
                 print(f"MQTT tentativa {i+1}/{tentativas} falhou: {e}")

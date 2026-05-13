@@ -108,7 +108,8 @@ except Exception as e:
 try:
     lcd.imprimir("Sincronizando hora...")
     sleep(5)
-    lcd.imprimir(f"\n{ajustar_hora_ntp()}",1)
+    ajustar_hora_ntp()
+    lcd.imprimir(f"\n{"ntp ok!"}",1)
     sleep(2)
 except Exception as e:
     #lcd.imprimir(f"\n{e}",1)
@@ -137,6 +138,9 @@ mqtt_ok = True  # coloca essa flag ANTES do while True
 
 while True:
     try:
+        
+        print(f"--- Ciclo | WiFi: {sta_if.isconnected()} | MQTT: {mqtt_ok} ---")
+
         # 1. Verifica WiFi e tenta reconectar se necessário
         if not sta_if.isconnected():
             print("WiFi caiu. Reconectando...")
@@ -166,6 +170,20 @@ while True:
                 print(f"Rede instável, MQTT adiado: {e}")
                 mqtt_ok = False
 
+        elif mqtt_ok:
+            try:
+                cliente.cliente.ping()
+
+            except Exception as e:
+                print(f"Broker sem resposta, reconectando: {e}")
+                mqtt_ok = False
+                try:
+                    cliente.reconectar()
+                    mqtt_ok = True
+                    print("MQTT reconectado!")
+                except Exception as e:
+                    print(f"Falha ao reconectar MQTT: {e}")
+
         # 2. Lê sensores (independente do MQTT)
         json_pub = {
             'timestamp': timestamp(),
@@ -184,10 +202,12 @@ while True:
         # 3. Publica MQTT só se a conexão estiver confirmada
         if mqtt_ok:
             try:
+                print("Publicando...")
                 cliente.publicar(
                     mensagem=dumps(json_pub),
                     topico=assets['mqtt']['topico']
                 )
+                print("publicado com sucesso!")
             except Exception as e:
                 print(f"Erro ao publicar MQTT: {e}")
                 mqtt_ok = False
