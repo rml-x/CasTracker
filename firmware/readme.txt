@@ -9,3 +9,5 @@ cd ..
 ./run_esp.bat
 
 ctrl+d apos rodar o .bat
+
+

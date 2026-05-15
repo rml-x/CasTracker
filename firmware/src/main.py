@@ -1,12 +1,14 @@
+import ntptime
 from modulos.conexao import conectar_wifi, ajustar_hora_ntp, timestamp
 from modulos.sensores import temperatura_ds18b20, pressao_bmp180, umidade_dht22
 from modulos.interface import cliente_mqtt
 from modulos.ihc import meu_lcd
-from machine import I2C, Pin, reset
+from machine import I2C, Pin, reset, WDT
 from ujson import load, dumps
-from time import sleep
+from time import sleep, time
 import gc
 from network import WLAN, STA_IF
+
 
 sta_if = WLAN(STA_IF)
 
@@ -109,36 +111,49 @@ try:
     lcd.imprimir("Sincronizando hora...")
     sleep(5)
     ajustar_hora_ntp()
+
     lcd.imprimir(f"\n{"ntp ok!"}",1)
     sleep(2)
 except Exception as e:
     #lcd.imprimir(f"\n{e}",1)
 
     lcd.imprimir("erro ntp!",1)
+    print(f"Erro NTP: {e}")
     sleep(3)
     reset()
 
 try:
     lcd.imprimir('Conectando MQTT...')
     hora_sincronizada = True
+    print("Instanciando cliente MQTT...")
+    print(f"broker: {assets['mqtt']['broker']}")
+    print(f"id_cliente: {assets['mqtt']['id_cliente']}")
+    print(f"token: {assets['mqtt']['token']}")
+
     cliente = cliente_mqtt(
         broker = assets['mqtt']['broker'],
-        id_cliente = assets['mqtt']['id_cliente']
+        id_cliente = assets['mqtt']['id_cliente'],
+        token=assets['mqtt']['token']
     )
     lcd.imprimir('\nMQTT Conectado!',1)
     sleep(2)
 except Exception as e:
     lcd.imprimir(f"\n{e}",1)
+    print(f"Erro MQTT: {e}")
     sleep(3)
     reset()
 
 lcd.imprimir('Medicoes: ')
 
-mqtt_ok = True  # coloca essa flag ANTES do while True
+mqtt_ok = True  
+wdt = WDT(timeout = 300)
+ntptime.settime()
+#ts = time.time() * 1000 
 
 while True:
     try:
         
+        wdt.feed()
         print(f"--- Ciclo | WiFi: {sta_if.isconnected()} | MQTT: {mqtt_ok} ---")
 
         # 1. Verifica WiFi e tenta reconectar se necessário
@@ -173,6 +188,8 @@ while True:
         elif mqtt_ok:
             try:
                 cliente.cliente.ping()
+                sleep(2)
+                cliente.cliente.check_msg()
 
             except Exception as e:
                 print(f"Broker sem resposta, reconectando: {e}")
@@ -185,15 +202,22 @@ while True:
                     print(f"Falha ao reconectar MQTT: {e}")
 
         # 2. Lê sensores (independente do MQTT)
-        json_pub = {
+        '''json_pub = {
             'timestamp': timestamp(),
             'Medições': []
+        }'''
+
+        json_pub = {
+            'ts': int(time() * 1000),  
+            
         }
+
         output = []
 
         for i in range(len(sensor)):
             sensor[i].ler_sensor()
-            json_pub['Medições'].append(sensor[i].empacotar())
+            #json_pub['Medições'].append(sensor[i].empacotar())
+            json_pub[sensor[i].tipo] = sensor[i].leitura
             output.append(f'\n{sensor[i].tipo[0:4]}: {sensor[i].leitura:.1f}')
 
         for nro, linha in enumerate(output):
@@ -203,6 +227,7 @@ while True:
         if mqtt_ok:
             try:
                 print("Publicando...")
+                print(f"JSON: {dumps(json_pub)}")
                 cliente.publicar(
                     mensagem=dumps(json_pub),
                     topico=assets['mqtt']['topico']

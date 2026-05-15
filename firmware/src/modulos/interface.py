@@ -2,10 +2,11 @@ from umqtt.simple import MQTTClient
 from time import sleep
 
 class cliente_mqtt:
-    def __init__(self, broker, id_cliente=''):
+    def __init__(self, broker, id_cliente='a30718b0-4fcc-11f1-9681-6110e8f55c0f', token = 'uy4PNplOdJi1gRvWresf'):
         self.broker = broker
         self.id_cliente = id_cliente
-        self.cliente = MQTTClient(self.id_cliente, self.broker, keepalive= 60)
+        self.token = token
+        self.cliente = MQTTClient(self.id_cliente, self.broker, user= self.token, password='', keepalive= 60)
         self.cliente.connect()
         self.cliente.sock.settimeout(10)
         print(f"MQTT conectado | keepalive=60 | timeout=10s") 
@@ -17,7 +18,7 @@ class cliente_mqtt:
                     self.cliente.disconnect()
                 except:
                     pass
-                self.cliente = MQTTClient(self.id_cliente, self.broker, keepalive= 60)
+                self.cliente = MQTTClient(self.id_cliente, self.broker, user=self.token, password='', keepalive= 60)
                 self.cliente.connect()
                 self.cliente.sock.settimeout(10)
                 print(f"MQTT conectado | keepalive=60 | timeout=10s")
