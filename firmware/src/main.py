@@ -146,7 +146,8 @@ except Exception as e:
 lcd.imprimir('Medicoes: ')
 
 mqtt_ok = True  
-wdt = WDT(timeout = 300)
+wdt = WDT(timeout = 300000) 
+#timeout 5 min
 ntptime.settime()
 #ts = time.time() * 1000 
 
