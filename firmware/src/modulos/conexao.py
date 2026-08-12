@@ -18,7 +18,13 @@ STATUS_MESSAGES = {
     network.STAT_GOT_IP: 'STAT_GOT_IP (Conexão bem-sucedida!)'
 }
 
-def conectar_wifi(ssid, pswd, tentativas=10, espera=5):
+def calcular_backoff(tentativa, base=2, minimo=3, maximo=60):
+    """Calcula tempo de espera exponencial (com teto), para não martelar
+    a rede/broker quando a falha é persistente."""
+    return min(minimo * (base ** tentativa), maximo)
+
+
+def conectar_wifi(ssid, pswd, tentativas=6, espera_base=3, espera_maxima=60):
     sta_if = WLAN(STA_IF)
    
     sta_if.active(False)
@@ -35,8 +41,14 @@ def conectar_wifi(ssid, pswd, tentativas=10, espera=5):
         if sta_if.isconnected():
             print("\nConectado com sucesso!")
             return True
-        print(f"WiFi tentativa {i+1}/{tentativas}...")
+        espera = calcular_backoff(i, minimo=espera_base, maximo=espera_maxima)
+        print(f"WiFi tentativa {i+1}/{tentativas}... aguardando {espera}s")
         sleep(espera)
+
+    # Checagem final: a conexão pode ter se estabelecido durante a última espera
+    if sta_if.isconnected():
+        print("\nConectado com sucesso!")
+        return True
 
     final_status = sta_if.status()
     error_message = STATUS_MESSAGES.get(final_status, f"Código de erro desconhecido: {final_status}")

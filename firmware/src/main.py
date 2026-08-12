@@ -146,8 +146,9 @@ except Exception as e:
 lcd.imprimir('Medicoes: ')
 
 mqtt_ok = True  
-wdt = WDT(timeout = 300000) 
-#timeout 5 min
+fila_pendente = []
+TAMANHO_MAX_FILA = 50  
+wdt = WDT(timeout = 300000)
 ntptime.settime()
 #ts = time.time() * 1000 
 
@@ -163,28 +164,32 @@ while True:
             mqtt_ok = False
             hora_sincronizada = False
 
-            if not conectar_wifi(ssid, pswd):
-                print("Sem sinal. Aguardando próximo ciclo...")
-                sleep(10)
-                continue
-
-            # WiFi voltou — estabiliza antes de subir os serviços
-            print("WiFi recuperado! Estabilizando...")
-            sleep(5)
-
             try:
-                print("Sincronizando NTP...")
-                ajustar_hora_ntp()
-                hora_sincronizada = True
+                conectar_wifi(ssid, pswd)
 
-                print("Reconectando MQTT...")
-                cliente.reconectar()
-                mqtt_ok = True
-                print("MQTT pronto!")
+                # WiFi voltou — estabiliza antes de subir os serviços
+                print("WiFi recuperado! Estabilizando...")
+                sleep(5)
+
+                try:
+                    print("Sincronizando NTP...")
+                    ajustar_hora_ntp()
+                    hora_sincronizada = True
+
+                    print("Reconectando MQTT...")
+                    cliente.reconectar()
+                    mqtt_ok = True
+                    print("MQTT pronto!")
+
+                except Exception as e:
+                    print(f"Rede instável, MQTT adiado: {e}")
+                    mqtt_ok = False
 
             except Exception as e:
-                print(f"Rede instável, MQTT adiado: {e}")
+                print(f"WiFi não reconectou neste ciclo: {e}")
                 mqtt_ok = False
+                # segue o fluxo (não faz 'continue') para que os sensores
+                # sejam lidos e a leitura entre na fila mesmo sem rede
 
         elif mqtt_ok:
             try:
@@ -224,19 +229,33 @@ while True:
         for nro, linha in enumerate(output):
             lcd.imprimir(linha, nro + 1)
 
-        # 3. Publica MQTT só se a conexão estiver confirmada
+        # 3. Adiciona a leitura atual na fila de pendências
+        fila_pendente.append(json_pub)
+        if len(fila_pendente) > TAMANHO_MAX_FILA:
+            descartada = fila_pendente.pop(0)
+            print(f"Fila cheia! Descartando leitura mais antiga (ts={descartada['ts']})")
+
+        # 4. Tenta esvaziar a fila publicando tudo que estiver pendente,
+        #    do mais antigo para o mais novo. Para no primeiro erro,
+        #    preservando o restante da fila para o próximo ciclo.
         if mqtt_ok:
-            try:
-                print("Publicando...")
-                print(f"JSON: {dumps(json_pub)}")
-                cliente.publicar(
-                    mensagem=dumps(json_pub),
-                    topico=assets['mqtt']['topico']
-                )
-                print("publicado com sucesso!")
-            except Exception as e:
-                print(f"Erro ao publicar MQTT: {e}")
-                mqtt_ok = False
+            while fila_pendente:
+                item = fila_pendente[0]
+                try:
+                    print(f"Publicando (fila: {len(fila_pendente)} pendente(s))...")
+                    print(f"JSON: {dumps(item)}")
+                    cliente.publicar(
+                        mensagem=dumps(item),
+                        topico=assets['mqtt']['topico']
+                    )
+                    fila_pendente.pop(0)
+                    print("publicado com sucesso!")
+                except Exception as e:
+                    print(f"Erro ao publicar MQTT: {e}")
+                    mqtt_ok = False
+                    break
+        else:
+            print(f"MQTT indisponível. {len(fila_pendente)} leitura(s) na fila.")
 
     except Exception as e:
         print(f"Erro inesperado no loop: {e}")
