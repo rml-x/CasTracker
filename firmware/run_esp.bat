@@ -19,6 +19,7 @@ mpremote connect COM6 fs cp src\modulos\conexao.py :modulos/conexao.py
 mpremote connect COM6 fs cp src\modulos\interface.py :modulos/interface.py
 mpremote connect COM6 fs cp src\modulos\sensores.py :modulos/sensores.py
 mpremote connect COM6 fs cp src\modulos\ihc.py :modulos/ihc.py
+mpremote connect COM6 fs cp src\modulos\armazenamento.py :modulos/armazenamento.py
 
 echo [2/3] Resetando o hardware...
 mpremote connect COM6 reset

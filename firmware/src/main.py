@@ -3,6 +3,7 @@ from modulos.conexao import conectar_wifi, ajustar_hora_ntp, timestamp
 from modulos.sensores import temperatura_ds18b20, pressao_bmp180, umidade_dht22
 from modulos.interface import cliente_mqtt
 from modulos.ihc import meu_lcd
+from modulos.armazenamento import salvar_fila, carregar_fila, limpar_arquivo_fila
 from machine import I2C, Pin, reset, WDT
 from ujson import load, dumps
 from time import sleep, time
@@ -146,8 +147,10 @@ except Exception as e:
 lcd.imprimir('Medicoes: ')
 
 mqtt_ok = True  
-fila_pendente = []
-TAMANHO_MAX_FILA = 50  
+fila_pendente = carregar_fila()
+if fila_pendente:
+    print(f"Recuperadas {len(fila_pendente)} leitura(s) pendente(s) de antes do reboot.")
+TAMANHO_MAX_FILA = 50  # limite pra não estourar a RAM do ESP32-C3
 wdt = WDT(timeout = 300000)
 ntptime.settime()
 #ts = time.time() * 1000 
@@ -256,6 +259,14 @@ while True:
                     break
         else:
             print(f"MQTT indisponível. {len(fila_pendente)} leitura(s) na fila.")
+
+        # 5. Persiste a fila em disco para sobreviver a um reboot inesperado
+        #    (watchdog, queda de energia, reset manual). Só grava quando há
+        #    pendências reais, evitando escrita desnecessária na flash.
+        if fila_pendente:
+            salvar_fila(fila_pendente)
+        else:
+            limpar_arquivo_fila()
 
     except Exception as e:
         print(f"Erro inesperado no loop: {e}")
