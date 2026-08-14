@@ -21,6 +21,11 @@ with open('config.json','r') as arquivo:
 ssid = assets['wifi']['ssid']
 pswd = assets['wifi']['pswd']
 
+fila_pendente = carregar_fila()
+if fila_pendente:
+    print(f"Recuperadas {len(fila_pendente)} leitura(s) pendente(s) de antes do reboot.")
+TAMANHO_MAX_FILA = 50  # limite pra não estourar a RAM do ESP32-C3
+
 sensor = []
 
 try:
@@ -147,10 +152,6 @@ except Exception as e:
 lcd.imprimir('Medicoes: ')
 
 mqtt_ok = True  
-fila_pendente = carregar_fila()
-if fila_pendente:
-    print(f"Recuperadas {len(fila_pendente)} leitura(s) pendente(s) de antes do reboot.")
-TAMANHO_MAX_FILA = 50  # limite pra não estourar a RAM do ESP32-C3
 wdt = WDT(timeout = 300000)
 ntptime.settime()
 #ts = time.time() * 1000 
@@ -224,19 +225,26 @@ while True:
         output = []
 
         for i in range(len(sensor)):
-            sensor[i].ler_sensor()
-            #json_pub['Medições'].append(sensor[i].empacotar())
-            json_pub[sensor[i].tipo] = sensor[i].leitura
-            output.append(f'\n{sensor[i].tipo[0:4]}: {sensor[i].leitura:.1f}')
+            valor = sensor[i].ler_sensor()
+            if valor is not None:
+                json_pub[sensor[i].tipo] = valor
+                output.append(f'\n{sensor[i].tipo[0:4]}: {valor:.1f}')
+            else:
+                output.append(f'\n{sensor[i].tipo[0:4]}: ERRO')
 
         for nro, linha in enumerate(output):
             lcd.imprimir(linha, nro + 1)
 
-        # 3. Adiciona a leitura atual na fila de pendências
-        fila_pendente.append(json_pub)
-        if len(fila_pendente) > TAMANHO_MAX_FILA:
-            descartada = fila_pendente.pop(0)
-            print(f"Fila cheia! Descartando leitura mais antiga (ts={descartada['ts']})")
+        # 3. Adiciona a leitura atual na fila de pendências, só se houver
+        #    pelo menos um sensor com dado válido (json_pub sempre tem 'ts',
+        #    então len > 1 significa que algo além do timestamp foi lido)
+        if len(json_pub) > 1:
+            fila_pendente.append(json_pub)
+            if len(fila_pendente) > TAMANHO_MAX_FILA:
+                descartada = fila_pendente.pop(0)
+                print(f"Fila cheia! Descartando leitura mais antiga (ts={descartada['ts']})")
+        else:
+            print("Nenhuma leitura válida neste ciclo - nada a enfileirar.")
 
         # 4. Tenta esvaziar a fila publicando tudo que estiver pendente,
         #    do mais antigo para o mais novo. Para no primeiro erro,
