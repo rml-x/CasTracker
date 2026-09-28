@@ -112,14 +112,3 @@ class pressao_bmp180(Sensor):
         return self.driver.get_pressure()
 
 
-class temperatura_bmp180(Sensor):
-    LIMITE_MIN = -20
-    LIMITE_MAX = 60
-
-    def __init__(self, i2c_bus):
-        super().__init__(pino = None, tipo = "temperatura", componente = "bmp180")
-        self.i2c_bus = i2c_bus
-        self.driver = BMP180(self.i2c_bus)
-
-    def _ler_bruto(self):
-        return self.driver.get_temperature()

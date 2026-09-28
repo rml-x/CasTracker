@@ -54,12 +54,3 @@ class pressao_bmp180(Sensor):
         self.leitura = self.driver.get_pressure()
         return self.leitura
     
-class temperatura_bmp180(Sensor):
-    def __init__(self, i2c_bus):
-        super().__init__(pino = None, tipo = "temperatura", componente = "bmp180")
-        self.i2c_bus = i2c_bus
-        self.driver = BMP180(self.i2c_bus)
-
-    def ler_sensor(self):
-        self.leitura = self.driver.get_temperature()
-        return self.leitura
